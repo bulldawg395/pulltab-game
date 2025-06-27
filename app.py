@@ -77,7 +77,6 @@ def login():
 @app.route('/logout')
 def logout():
     session.pop('user', None)
-    session.pop('admin', None)
     return redirect('/')
 
 @app.route('/balance')
@@ -114,78 +113,6 @@ def play():
     conn.commit()
     conn.close()
     return jsonify({'symbols': symbols, 'payout': payout})
-
-@app.route('/admin', methods=['GET', 'POST'])
-def admin():
-    if request.method == 'POST':
-        if request.form.get('password') != 'Jcrx2009':
-            return render_template('admin_login.html', error="Wrong password.")
-        session['admin'] = True
-
-    if not session.get('admin'):
-        return render_template('admin_login.html')
-
-    conn = db_conn()
-    c = conn.cursor()
-
-    # Add funds
-    if request.args.get('adduser') and request.args.get('amount'):
-        try:
-            user = request.args['adduser']
-            amount = float(request.args['amount'])
-            c.execute("UPDATE users SET balance = balance + ? WHERE username = ?", (amount, user))
-            conn.commit()
-        except:
-            pass
-
-    # Remove funds
-    if request.args.get('removeuser') and request.args.get('amount'):
-        try:
-            user = request.args['removeuser']
-            amount = float(request.args['amount'])
-            c.execute("UPDATE users SET balance = balance - ? WHERE username = ?", (amount, user))
-            conn.commit()
-        except:
-            pass
-
-    c.execute("SELECT username, balance FROM users")
-    users = c.fetchall()
-    conn.close()
-    return render_template('admin.html', users=users)
-
-@app.route('/admin/user/<username>')
-def user_history(username):
-    if not session.get('admin'):
-        return redirect('/admin')
-
-    conn = db_conn()
-    c = conn.cursor()
-    c.execute("SELECT symbols, payout, timestamp FROM spins WHERE username = ? ORDER BY id DESC", (username,))
-    history = c.fetchall()
-    conn.close()
-
-    return render_template('user_history.html', username=username, history=history)
-
-@app.route('/history')
-def history():
-    if 'user' not in session:
-        return redirect('/')
-    conn = db_conn()
-    c = conn.cursor()
-    c.execute("SELECT symbols, payout, timestamp FROM spins WHERE username = ? ORDER BY id DESC LIMIT 20", (session['user'],))
-    history = c.fetchall()
-    conn.close()
-    return render_template('history.html', history=history)
-
-@app.route('/info')
-def info():
-    return render_template('info.html')
-
-@app.route('/mines')
-def mines():
-    if 'user' not in session:
-        return redirect('/')
-    return render_template('mines.html', logged=True, user=session['user'])
 
 @app.route('/tower')
 def tower():
@@ -240,6 +167,80 @@ def tower_play():
 
     return jsonify({'success': True, 'payout': payout})
 
+@app.route('/admin', methods=['GET', 'POST'])
+def admin():
+    if request.method == 'POST':
+        if request.form.get('password') != 'Jcrx2009':
+            return render_template('admin_login.html', error="Wrong password.")
+        session['admin'] = True
+
+    if not session.get('admin'):
+        return render_template('admin_login.html')
+
+    conn = db_conn()
+    c = conn.cursor()
+
+    # Add or subtract balance
+    if request.method == 'GET' and request.args.get('adduser') and request.args.get('amount'):
+        user = request.args['adduser']
+        try:
+            amount = float(request.args['amount'])
+            c.execute("UPDATE users SET balance = balance + ? WHERE username = ?", (amount, user))
+            conn.commit()
+        except:
+            pass
+
+    # Fetch users for balance management
+    c.execute("SELECT username, balance FROM users")
+    users = c.fetchall()
+
+    # Fetch tower plays
+    c.execute("""
+        SELECT username, symbols, payout, timestamp 
+        FROM spins 
+        WHERE symbols LIKE 'TOWER-%'
+        ORDER BY timestamp DESC LIMIT 50
+    """)
+    tower_plays = c.fetchall()
+
+    conn.close()
+
+    return render_template('admin.html', users=users, tower_plays=tower_plays)
+
+@app.route('/admin_tower_history')
+def admin_tower_history():
+    if not session.get('admin'):
+        return jsonify({'error': 'Access denied'})
+
+    username = request.args.get('username')
+    if not username:
+        return jsonify({'error': 'Username required'})
+
+    conn = db_conn()
+    c = conn.cursor()
+    c.execute("""
+        SELECT symbols, payout, timestamp FROM spins 
+        WHERE username = ? AND symbols LIKE 'TOWER-%' ORDER BY timestamp DESC LIMIT 100
+    """, (username,))
+    rows = c.fetchall()
+    conn.close()
+
+    history = []
+    for symbols, payout, timestamp in rows:
+        parts = symbols.split('-')
+        difficulty = parts[1] if len(parts) > 1 else 'unknown'
+        path_raw = parts[2] if len(parts) > 2 else '[]'
+        path = path_raw[1:-1]  # Strip brackets
+        history.append({
+            'difficulty': difficulty,
+            'path': path,
+            'payout': payout,
+            'timestamp': timestamp
+        })
+
+    return jsonify({'history': history})
+
+# Required for Render or similar deployment
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
