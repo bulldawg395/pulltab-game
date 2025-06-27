@@ -1,83 +1,162 @@
-from flask import Flask, render_template, request, session, redirect, jsonify
-import sqlite3, random, datetime
+from flask import Flask, render_template, request, redirect, session, jsonify
+import sqlite3, random
+from datetime import datetime
 
-app = Flask(__name__, static_folder="static")
-app.secret_key = "secretkey"
+app = Flask(__name__)
+app.secret_key = 'your_secret_key'
 
-db = sqlite3.connect("data.db", check_same_thread=False)
-db.execute("""CREATE TABLE IF NOT EXISTS users (
-                username TEXT PRIMARY KEY, password TEXT, balance REAL DEFAULT 0)""")
-db.execute("""CREATE TABLE IF NOT EXISTS history (
-                id INTEGER PRIMARY KEY, user TEXT, combination TEXT, payout REAL, ts TEXT)""")
+DATABASE = 'casino.db'
 
-@app.route("/")
-def index():
-    return render_template("index.html", logged="user" in session, user=session.get("user"))
+def db_conn():
+    return sqlite3.connect(DATABASE)
 
-@app.route("/register", methods=["POST"])
+# Create tables if they don't exist
+def init_db():
+    conn = db_conn()
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            balance REAL DEFAULT 0
+        )
+    ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS spins (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            symbols TEXT,
+            payout REAL,
+            timestamp TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+init_db()
+
+# Symbols and payouts
+SYMBOLS = ['🌴', '🍍', '🌞', '🌊', '🏖️', '🐚']
+WINNING_COMBOS = {
+    ('🌴', '🌴', '🌴'): 5,
+    ('🍍', '🍍', '🍍'): 10,
+    ('🌞', '🌞', '🌞'): 50
+}
+
+# ---------------------- ROUTES ---------------------- #
+
+@app.route('/')
+def home():
+    logged = 'user' in session
+    return render_template('index.html', logged=logged, user=session.get('user'))
+
+@app.route('/register', methods=['POST'])
 def register():
-    u, p = request.form["username"], request.form["password"]
+    username = request.form['username']
+    password = request.form['password']
+    conn = db_conn()
+    c = conn.cursor()
     try:
-        db.execute("INSERT INTO users(username,password) VALUES(?,?)",(u,p))
-        db.commit()
-        session["user"] = u
-    except: pass
-    return redirect("/")
+        c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, password))
+        conn.commit()
+        session['user'] = username
+    except sqlite3.IntegrityError:
+        return "Username already taken."
+    finally:
+        conn.close()
+    return redirect('/')
 
-@app.route("/login", methods=["POST"])
+@app.route('/login', methods=['POST'])
 def login():
-    u, p = request.form["username"], request.form["password"]
-    row = db.execute("SELECT * FROM users WHERE username=? AND password=?",(u,p)).fetchone()
-    if row: session["user"] = u
-    return redirect("/")
+    username = request.form['username']
+    password = request.form['password']
+    conn = db_conn()
+    c = conn.cursor()
+    c.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username, password))
+    user = c.fetchone()
+    conn.close()
+    if user:
+        session['user'] = username
+        return redirect('/')
+    return "Invalid credentials"
 
-@app.route("/logout")
+@app.route('/logout')
 def logout():
-    session.clear(); return redirect("/")
+    session.pop('user', None)
+    return redirect('/')
 
-@app.route("/balance")
+@app.route('/balance')
 def balance():
-    if "user" not in session: return jsonify({"balance":0})
-    r = db.execute("SELECT balance FROM users WHERE username=?",(session["user"],)).fetchone()[0]
-    return jsonify({"balance":round(r,2)})
+    if 'user' not in session:
+        return jsonify({'balance': 0})
+    conn = db_conn()
+    c = conn.cursor()
+    c.execute("SELECT balance FROM users WHERE username = ?", (session['user'],))
+    result = c.fetchone()
+    conn.close()
+    return jsonify({'balance': result[0] if result else 0})
 
-@app.route("/play", methods=["POST"])
+@app.route('/play', methods=['POST'])
 def play():
-    if "user" not in session: return jsonify({"error":"Log in"})
-    u=session["user"]; row=db.execute("SELECT balance FROM users WHERE username=?",(u,)).fetchone()[0]
-    if row<1: return jsonify({"error":"Insufficient funds"})
-    symbols=random.choices(["🌴","🍍","🌞","🌊","🏖️","🐚"],k=3)
-    combo="".join(symbols)
-    payout={"🌴🌴🌴":5,"🍍🍍🍍":10,"🌞🌞🌞":50}.get(combo,0)
-    row=row-1+payout
-    db.execute("UPDATE users SET balance=? WHERE username=?",(row,u))
-    db.execute("INSERT INTO history(user,combination,payout,ts) VALUES(?,?,?,?)",
-               (u,combo,payout,datetime.datetime.now().isoformat()))
-    db.commit()
-    return jsonify({"symbols":symbols,"payout":payout,"balance":round(row,2)})
+    if 'user' not in session:
+        return jsonify({'error': 'Login required'})
 
-@app.route("/history")
-def history():
-    if "user" not in session: return redirect("/")
-    h = db.execute("SELECT combination,payout,ts FROM history WHERE user=? ORDER BY id DESC LIMIT 20",
-                   (session["user"],)).fetchall()
-    return render_template("history.html", hist=h)
+    conn = db_conn()
+    c = conn.cursor()
+    c.execute("SELECT balance FROM users WHERE username = ?", (session['user'],))
+    row = c.fetchone()
+    if not row or row[0] < 1:
+        conn.close()
+        return jsonify({'error': 'Insufficient balance'})
 
-@app.route("/admin", methods=["GET","POST"])
+    symbols = tuple(random.choices(SYMBOLS, k=3))
+    payout = WINNING_COMBOS.get(symbols, 0)
+
+    # 94.5% RTP adjustment (optional: force win chances)
+    # Not enforced here due to random sampling + set payout combos
+
+    new_balance = row[0] - 1 + payout
+    c.execute("UPDATE users SET balance = ? WHERE username = ?", (new_balance, session['user']))
+    c.execute("INSERT INTO spins (username, symbols, payout, timestamp) VALUES (?, ?, ?, ?)",
+              (session['user'], ''.join(symbols), payout, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    conn.commit()
+    conn.close()
+    return jsonify({'symbols': symbols, 'payout': payout})
+
+@app.route('/admin', methods=['GET', 'POST'])
 def admin():
-    if request.method=="POST" and request.form.get("password")=="Jcrx2009":
-        users=db.execute("SELECT username,balance FROM users").fetchall()
-        return render_template("admin.html", access=True, users=users)
-    return render_template("admin.html", access=False)
+    if request.method == 'POST':
+        if request.form.get('password') != 'Jcrx2009':
+            return "Wrong admin password."
+        session['admin'] = True
 
-@app.route("/admin/fund", methods=["POST"])
-def fund():
-    if request.form.get("password")!="Jcrx2009": return redirect("/admin")
-    u,a=request.form["username"],float(request.form["amount"])
-    db.execute("UPDATE users SET balance=balance+? WHERE username=?",(a,u)); db.commit()
-    return redirect("/admin")
+    if not session.get('admin'):
+        return render_template('admin_login.html')
 
-app.run(host="0.0.0.0", port=3000)
+    conn = db_conn()
+    c = conn.cursor()
+    if request.args.get('adduser'):
+        user = request.args['adduser']
+        amount = float(request.args.get('amount', 0))
+        c.execute("UPDATE users SET balance = balance + ? WHERE username = ?", (amount, user))
+        conn.commit()
+
+    c.execute("SELECT username, balance FROM users")
+    users = c.fetchall()
+    conn.close()
+    return render_template('admin.html', users=users)
+
+@app.route('/history')
+def history():
+    if 'user' not in session:
+        return redirect('/')
+    conn = db_conn()
+    c = conn.cursor()
+    c.execute("SELECT symbols, payout, timestamp FROM spins WHERE username = ? ORDER BY id DESC LIMIT 20", (session['user'],))
+    history = c.fetchall()
+    conn.close()
+    return render_template('history.html', history=history)
 
 @app.route("/info")
 def info():
