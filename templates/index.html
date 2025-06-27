@@ -2,54 +2,78 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Beach Pull Tabs</title>
+  <title>🌴 Beach Pull Tabs</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <h1>🌴 Beach Pull Tabs 🌞</h1>
+  <header>
+    <h1>🌞 Beach Pull Tabs</h1>
+    <nav>
+      {% if logged_in %}
+        <span>Welcome, {{ username }}!</span>
+        <a href="/logout">Logout</a>
+      {% else %}
+        <a href="#register">Register</a>
+        <a href="#login">Login</a>
+      {% endif %}
+      <a href="/admin">Admin</a>
+    </nav>
+  </header>
 
-  {% if not logged_in %}
-    <form method="POST" action="/register">
-      <h2>Register</h2>
-      <input name="username" placeholder="Username" required><br>
-      <input name="password" type="password" placeholder="Password" required><br>
-      <button type="submit">Register</button>
-    </form>
+  <main>
+    {% if not logged_in %}
+      <section id="register">
+        <h2>Create Account</h2>
+        <form method="POST" action="/register">
+          <input name="username" placeholder="Username" required>
+          <input name="password" type="password" placeholder="Password" required>
+          <button type="submit">Register</button>
+        </form>
+      </section>
 
-    <form method="POST" action="/login">
-      <h2>Login</h2>
-      <input name="username" placeholder="Username" required><br>
-      <input name="password" type="password" placeholder="Password" required><br>
-      <button type="submit">Login</button>
-    </form>
-  {% else %}
-    <h2>Welcome, {{ username }}!</h2>
-    <p>💰 Balance: $<span id="balance">...</span></p>
-    <div id="symbols" style="font-size: 2em;">❓ ❓ ❓</div>
-    <button onclick="play()">🎰 Play ($1)</button>
-    <form method="GET" action="/logout">
-      <button type="submit">Logout</button>
-    </form>
-    <p id="result"></p>
-    <script>
-      async function updateBalance() {
-        const res = await fetch("/balance");
-        const data = await res.json();
-        document.getElementById("balance").innerText = data.balance;
+      <section id="login">
+        <h2>Login</h2>
+        <form method="POST" action="/login">
+          <input name="username" placeholder="Username" required>
+          <input name="password" type="password" placeholder="Password" required>
+          <button type="submit">Login</button>
+        </form>
+      </section>
+    {% else %}
+      <section id="game">
+        <h2>🎰 Pull Tabs</h2>
+        <p>Balance: 💰 $<span id="balance">...</span></p>
+        <div id="symbols">❓ ❓ ❓</div>
+        <button onclick="play()">Play $1</button>
+        <p id="result"></p>
+      </section>
+    {% endif %}
+  </main>
+
+  <footer>
+    <p>&copy; 2025 Beach Pull Tabs Casino</p>
+  </footer>
+
+  <script>
+    async function updateBalance() {
+      const res = await fetch("/balance");
+      const data = await res.json();
+      document.getElementById("balance").innerText = data.balance;
+    }
+    async function play() {
+      const res = await fetch("/play", { method: "POST" });
+      const data = await res.json();
+      if (data.error) {
+        alert(data.error);
+      } else {
+        document.getElementById("symbols").innerText = data.symbols.join(" ");
+        document.getElementById("result").innerText = data.payout > 0
+          ? `🎉 You won $${data.payout}!`
+          : "Try again!";
+        updateBalance();
       }
-      async function play() {
-        const res = await fetch("/play", { method: "POST" });
-        const data = await res.json();
-        if (data.error) {
-          alert(data.error);
-        } else {
-          document.getElementById("symbols").innerText = data.symbols.join(" ");
-          document.getElementById("result").innerText = data.payout > 0 ? `🎉 Won $${data.payout}` : "Try again!";
-          updateBalance();
-        }
-      }
-      updateBalance();
-    </script>
-  {% endif %}
+    }
+    {% if logged_in %} updateBalance(); {% endif %}
+  </script>
 </body>
 </html>
