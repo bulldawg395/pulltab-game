@@ -187,6 +187,59 @@ def mines():
         return redirect('/')
     return render_template('mines.html', logged=True, user=session['user'])
 
+@app.route('/tower')
+def tower():
+    if 'user' not in session:
+        return redirect('/')
+    return render_template('tower.html')
+
+@app.route('/tower_play', methods=['POST'])
+def tower_play():
+    if 'user' not in session:
+        return jsonify({'error': 'Login required'})
+
+    data = request.get_json()
+    difficulty = data.get('difficulty')
+    wager = float(data.get('wager', 0))
+    path = data.get('path', [])
+
+    if not difficulty or not path or wager <= 0:
+        return jsonify({'error': 'Invalid data'})
+
+    multipliers = {
+        'easy': [1.00, 1.13, 1.27, 1.42, 1.58, 1.75, 1.93, 2.12, 2.32],
+        'medium': [1.00, 1.21, 1.47, 1.78, 2.14, 2.56, 3.06, 3.63, 4.30],
+        'hard': [1.00, 1.39, 1.93, 2.67, 3.70, 5.13, 7.12, 9.89, 13.72]
+    }
+
+    if difficulty not in multipliers:
+        return jsonify({'error': 'Invalid difficulty'})
+
+    multiplier_list = multipliers[difficulty]
+    level = len(path)
+    if level == 0 or level > 9:
+        return jsonify({'error': 'Invalid path length'})
+
+    multiplier = multiplier_list[level - 1]
+    payout = round(wager * multiplier, 2)
+
+    conn = db_conn()
+    c = conn.cursor()
+    c.execute("SELECT balance FROM users WHERE username = ?", (session['user'],))
+    balance_row = c.fetchone()
+    if not balance_row or balance_row[0] < wager:
+        conn.close()
+        return jsonify({'error': 'Insufficient balance'})
+
+    new_balance = balance_row[0] - wager + payout
+    c.execute("UPDATE users SET balance = ? WHERE username = ?", (new_balance, session['user']))
+    c.execute("INSERT INTO spins (username, symbols, payout, timestamp) VALUES (?, ?, ?, ?)",
+              (session['user'], f"TOWER-{difficulty}-{path}", payout, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    conn.commit()
+    conn.close()
+
+    return jsonify({'success': True, 'payout': payout})
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
