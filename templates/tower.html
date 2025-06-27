@@ -1,233 +1,257 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Tower Game</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background: #0e0e0e;
+      margin: 0;
+      background: #0d0d0d;
+      font-family: 'Segoe UI', sans-serif;
       color: white;
-      text-align: center;
-      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: start;
+      min-height: 100vh;
     }
+
     h1 {
-      margin-bottom: 10px;
+      margin-top: 20px;
+      font-size: 2.5em;
     }
-    .wager-form, .difficulty-select {
-      margin: 15px 0;
+
+    .controls {
+      margin: 20px;
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
     }
-    input, select, button {
+
+    .controls input,
+    .controls select,
+    .controls button {
       padding: 10px;
       font-size: 16px;
-      margin: 5px;
-      border-radius: 5px;
       border: none;
+      border-radius: 6px;
     }
-    #towerGrid {
+
+    .controls button {
+      background: #28a745;
+      color: white;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .status {
+      margin: 10px;
+      font-size: 18px;
+      text-align: center;
+    }
+
+    .game-board {
       display: flex;
-      flex-direction: column-reverse;
-      align-items: center;
-      margin-top: 20px;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 30px;
     }
-    .tower-row {
+
+    .row {
       display: flex;
       gap: 10px;
-      margin-bottom: 10px;
+      justify-content: center;
     }
-    .tower-box {
-      width: 60px;
-      height: 60px;
-      background: #222;
+
+    .tile {
+      width: 80px;
+      height: 80px;
+      background-color: #1e1e1e;
+      border: 2px solid #333;
+      border-radius: 10px;
+      font-size: 28px;
       display: flex;
       justify-content: center;
       align-items: center;
-      font-size: 24px;
-      border-radius: 5px;
       cursor: pointer;
-      transition: background 0.2s ease;
+      transition: 0.2s;
     }
-    .tower-box:hover {
-      background: #444;
+
+    .tile.clicked {
+      background-color: #4caf50;
     }
-    .safe {
-      background: #28a745 !important;
+
+    .tile.bomb {
+      background-color: #dc3545;
     }
-    .bomb {
-      background: #dc3545 !important;
+
+    .tile.disabled {
+      pointer-events: none;
+      opacity: 0.5;
     }
-    #status {
-      margin-top: 20px;
-      font-weight: bold;
+
+    .footer {
+      margin-top: auto;
+      padding: 10px;
+      text-align: center;
+      font-size: 14px;
+      color: #888;
     }
-    #cashOutBtn {
-      background: #ffc107;
-      color: black;
-      display: none;
+
+    @media (max-width: 600px) {
+      .tile {
+        width: 60px;
+        height: 60px;
+        font-size: 20px;
+      }
     }
   </style>
 </head>
 <body>
+  <h1>🎯 Tower Game</h1>
 
-  <h1>Tower Game</h1>
-
-  <div class="wager-form">
-    <label>Wager ($):</label>
-    <input type="number" id="wager" min="0.1" max="1000" step="0.1" value="1.0">
-  </div>
-
-  <div class="difficulty-select">
-    <label>Difficulty:</label>
+  <div class="controls">
     <select id="difficulty">
-      <option value="easy">Easy (4 tiles/row)</option>
-      <option value="medium">Medium (3 tiles/row)</option>
-      <option value="hard">Hard (2 tiles/row)</option>
+      <option value="easy">Easy (4 tiles)</option>
+      <option value="medium">Medium (3 tiles)</option>
+      <option value="hard">Hard (2 tiles)</option>
     </select>
-    <button onclick="startTower()">Start Game</button>
+    <input type="number" id="wager" min="0.1" step="0.1" placeholder="Wager ($)" />
+    <button onclick="startGame()">Start Game</button>
+    <button id="cashoutBtn" style="background:#ffc107; display:none;" onclick="cashout()">💰 Cash Out</button>
   </div>
 
-  <button id="cashOutBtn" onclick="cashOut()">💸 Cash Out</button>
+  <div class="status" id="status">Select difficulty and wager to start.</div>
+  <div class="status" id="payoutStatus"></div>
 
-  <div id="towerGrid"></div>
-  <div id="status"></div>
+  <div class="game-board" id="board"></div>
+
+  <div class="footer">
+    RTP: 94.5% | Payouts scale per level | Game ends when you hit a bomb or cash out
+  </div>
 
   <script>
-    const payoutMultipliers = {
+    let path = [];
+    let currentRow = 0;
+    let gameStarted = false;
+    let board = document.getElementById("board");
+    let status = document.getElementById("status");
+    let payoutStatus = document.getElementById("payoutStatus");
+    let difficulty = "";
+    let wager = 0;
+    let maxRows = 9;
+    let tileCount = 0;
+
+    const multipliers = {
       easy: [1.00, 1.13, 1.27, 1.42, 1.58, 1.75, 1.93, 2.12, 2.32],
       medium: [1.00, 1.21, 1.47, 1.78, 2.14, 2.56, 3.06, 3.63, 4.30],
       hard: [1.00, 1.39, 1.93, 2.67, 3.70, 5.13, 7.12, 9.89, 13.72]
     };
 
-    const columns = {
-      easy: 4,
-      medium: 3,
-      hard: 2
-    };
+    function startGame() {
+      difficulty = document.getElementById("difficulty").value;
+      wager = parseFloat(document.getElementById("wager").value);
 
-    let gamePath = [];
-    let currentRow = 0;
-    let playing = false;
-    let currentDifficulty = "easy";
+      if (isNaN(wager) || wager < 0.1) {
+        alert("Please enter a valid wager.");
+        return;
+      }
 
-    function startTower() {
-      currentDifficulty = document.getElementById('difficulty').value;
-      gamePath = [];
+      tileCount = difficulty === "easy" ? 4 : difficulty === "medium" ? 3 : 2;
+      board.innerHTML = "";
+      path = [];
       currentRow = 0;
-      playing = true;
-      document.getElementById('towerGrid').innerHTML = '';
-      document.getElementById('status').innerText = '';
-      document.getElementById('cashOutBtn').style.display = 'none';
+      gameStarted = true;
+      document.getElementById("cashoutBtn").style.display = "inline-block";
+      status.textContent = "Game Started. Pick a tile.";
+      payoutStatus.textContent = "Multiplier: 1x | Payout: $" + wager.toFixed(2);
 
-      let colCount = columns[currentDifficulty];
-
-      for (let i = 0; i < 9; i++) {
-        let row = document.createElement('div');
-        row.className = "tower-row";
-        for (let j = 0; j < colCount; j++) {
-          let box = document.createElement('div');
-          box.className = "tower-box";
-          box.dataset.index = j;
-          box.dataset.row = i;
-          box.onclick = () => handleClick(i, j);
-          row.appendChild(box);
-        }
-        document.getElementById('towerGrid').prepend(row);
-      }
+      renderRow();
     }
 
-    function handleClick(row, col) {
-      if (!playing || row !== currentRow) return;
-
-      gamePath.push(col);
-      revealRow(row, col);
-
-      currentRow++;
-      if (currentRow === 9) {
-        finishGame();
-      } else {
-        let wager = parseFloat(document.getElementById('wager').value);
-        let multiplier = payoutMultipliers[currentDifficulty][currentRow];
-        let total = (wager * multiplier).toFixed(2);
-        document.getElementById('cashOutBtn').style.display = 'inline-block';
-        document.getElementById('status').innerText =
-          `✅ Safe! Current Payout: x${multiplier.toFixed(2)} → $${total}`;
+    function renderRow() {
+      if (currentRow >= maxRows) {
+        status.textContent = "Max level reached. Auto cashing out!";
+        cashout();
+        return;
       }
+
+      let rowDiv = document.createElement("div");
+      rowDiv.className = "row";
+
+      const bombIndex = Math.floor(Math.random() * tileCount);
+
+      for (let i = 0; i < tileCount; i++) {
+        let tile = document.createElement("div");
+        tile.className = "tile";
+        tile.innerHTML = "❓";
+        tile.onclick = () => {
+          tile.classList.add("clicked");
+          tile.innerHTML = "✅";
+          if (i === bombIndex) {
+            tile.classList.add("bomb");
+            tile.innerHTML = "💣";
+            status.textContent = "Boom! You hit a bomb.";
+            payoutStatus.textContent = "Game Over.";
+            disableBoard();
+            document.getElementById("cashoutBtn").style.display = "none";
+          } else {
+            path.push(i);
+            currentRow++;
+            updatePayoutDisplay();
+            renderRow();
+          }
+        };
+        rowDiv.appendChild(tile);
+      }
+
+      board.appendChild(rowDiv);
     }
 
-    function revealRow(row, chosen) {
-      const boxes = document.querySelectorAll(`.tower-row:nth-child(${9 - row}) .tower-box`);
-      const bomb = Math.floor(Math.random() * boxes.length);
-      boxes.forEach((box, idx) => {
-        box.onclick = null;
-        if (idx == chosen && idx == bomb) {
-          box.classList.add('bomb');
-          endGame(false);
-        } else if (idx == chosen) {
-          box.classList.add('safe');
-        }
+    function disableBoard() {
+      document.querySelectorAll(".tile").forEach(tile => {
+        tile.classList.add("disabled");
+        tile.onclick = null;
       });
-
-      if (chosen === bomb) {
-        document.getElementById('cashOutBtn').style.display = 'none';
-      }
     }
 
-    function endGame(won) {
-      playing = false;
-      document.getElementById('cashOutBtn').style.display = 'none';
-
-      if (!won) {
-        document.getElementById('status').innerText = '💥 You hit a bomb!';
-      }
-
-      sendTowerResult();
+    function updatePayoutDisplay() {
+      let multiplier = multipliers[difficulty][currentRow - 1];
+      let payout = (wager * multiplier).toFixed(2);
+      payoutStatus.textContent = `Multiplier: ${multiplier.toFixed(2)}x | Payout: $${payout}`;
     }
 
-    function finishGame() {
-      let wager = parseFloat(document.getElementById('wager').value);
-      let payout = (wager * payoutMultipliers[currentDifficulty][currentRow - 1]).toFixed(2);
-      document.getElementById('status').innerText =
-        `🎉 You won all rows! Final Payout: x${payoutMultipliers[currentDifficulty][currentRow - 1].toFixed(2)} → $${payout}`;
-      endGame(true);
-    }
+    function cashout() {
+      if (!gameStarted || path.length === 0) return;
 
-    function cashOut() {
-      if (!playing || gamePath.length === 0) return;
-
-      const confirmCashOut = confirm("Are you sure you want to cash out now?");
-      if (!confirmCashOut) return;
-
-      playing = false;
-      document.getElementById('cashOutBtn').style.display = 'none';
-
-      let wager = parseFloat(document.getElementById('wager').value);
-      let payout = (wager * payoutMultipliers[currentDifficulty][currentRow - 1]).toFixed(2);
-
-      document.getElementById('status').innerText =
-        `💸 You cashed out at x${payoutMultipliers[currentDifficulty][currentRow - 1].toFixed(2)} → $${payout}`;
-
-      sendTowerResult();
-    }
-
-    function sendTowerResult() {
-      const wager = parseFloat(document.getElementById('wager').value);
+      let multiplier = multipliers[difficulty][path.length - 1];
+      let payout = (wager * multiplier).toFixed(2);
 
       fetch("/tower_play", {
         method: "POST",
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({
-          difficulty: currentDifficulty,
-          path: gamePath,
-          wager: wager
+          difficulty,
+          wager,
+          path
         })
-      }).then(res => res.json())
-        .then(data => {
-          if (data.error) {
-            alert(data.error);
-          }
-        });
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          status.textContent = `You cashed out for $${data.payout.toFixed(2)}!`;
+          payoutStatus.textContent = "";
+        } else {
+          alert(data.error || "Something went wrong.");
+        }
+        document.getElementById("cashoutBtn").style.display = "none";
+        disableBoard();
+      });
     }
   </script>
-
 </body>
 </html>
