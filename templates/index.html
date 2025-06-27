@@ -1,16 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>🌴 Beach Pull Tabs</title>
+  <title>Beach Pull Tabs</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
   <header>
-    <h1>🌞 Beach Pull Tabs</h1>
+    <h1>🏝️ Beach Pull Tabs</h1>
     <nav>
       {% if logged_in %}
-        <span>Welcome, {{ username }}!</span>
+        <span>Hello, {{ username }}!</span>
         <a href="/logout">Logout</a>
       {% else %}
         <a href="#register">Register</a>
@@ -22,37 +21,29 @@
 
   <main>
     {% if not logged_in %}
-      <section id="register">
-        <h2>Create Account</h2>
-        <form method="POST" action="/register">
-          <input name="username" placeholder="Username" required>
-          <input name="password" type="password" placeholder="Password" required>
-          <button type="submit">Register</button>
-        </form>
-      </section>
-
-      <section id="login">
-        <h2>Login</h2>
-        <form method="POST" action="/login">
-          <input name="username" placeholder="Username" required>
-          <input name="password" type="password" placeholder="Password" required>
-          <button type="submit">Login</button>
-        </form>
-      </section>
+      <form action="/register" method="POST">
+        <input name="username" placeholder="Username">
+        <input name="password" type="password" placeholder="Password">
+        <button type="submit">Register</button>
+      </form>
+      <form action="/login" method="POST">
+        <input name="username" placeholder="Username">
+        <input name="password" type="password" placeholder="Password">
+        <button type="submit">Login</button>
+      </form>
     {% else %}
-      <section id="game">
-        <h2>🎰 Pull Tabs</h2>
-        <p>Balance: 💰 $<span id="balance">...</span></p>
-        <div id="symbols">❓ ❓ ❓</div>
-        <button onclick="play()">Play $1</button>
+      <div id="game">
+        <p>Balance: $<span id="balance">0</span></p>
+        <div id="spinner">
+          <div id="s1">❓</div>
+          <div id="s2">❓</div>
+          <div id="s3">❓</div>
+        </div>
+        <button id="play" onclick="play()">Play $1</button>
         <p id="result"></p>
-      </section>
+      </div>
     {% endif %}
   </main>
-
-  <footer>
-    <p>&copy; 2025 Beach Pull Tabs Casino</p>
-  </footer>
 
   <script>
     async function updateBalance() {
@@ -60,19 +51,27 @@
       const data = await res.json();
       document.getElementById("balance").innerText = data.balance;
     }
+
     async function play() {
+      document.getElementById("result").innerText = "Spinning...";
+      document.getElementById("spinner").classList.add("spin");
+
       const res = await fetch("/play", { method: "POST" });
       const data = await res.json();
+
+      document.getElementById("spinner").classList.remove("spin");
+
       if (data.error) {
         alert(data.error);
       } else {
-        document.getElementById("symbols").innerText = data.symbols.join(" ");
-        document.getElementById("result").innerText = data.payout > 0
-          ? `🎉 You won $${data.payout}!`
-          : "Try again!";
+        ["s1", "s2", "s3"].forEach((id, i) => {
+          document.getElementById(id).innerText = data.symbols[i];
+        });
+        document.getElementById("result").innerText = data.payout > 0 ? `🎉 You won $${data.payout}!` : "Try again!";
         updateBalance();
       }
     }
+
     {% if logged_in %} updateBalance(); {% endif %}
   </script>
 </body>
