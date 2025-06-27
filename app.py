@@ -1,10 +1,12 @@
 from flask import Flask, render_template, request, redirect, session, jsonify
 import sqlite3, random, os
 from datetime import datetime
+import uuid
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 DATABASE = 'casino.db'
+active_mines_games = {}
 
 def db_conn():
     return sqlite3.connect(DATABASE)
@@ -40,6 +42,23 @@ WINNING_COMBOS = {
     ('🍍', '🍍', '🍍'): 10,
     ('🌞', '🌞', '🌞'): 50
 }
+
+def get_mines_multipliers(bombs, rtp=0.94, total_tiles=25):
+    safe_tiles = total_tiles - bombs
+    multipliers = []
+
+    for k in range(1, safe_tiles + 1):
+        prob = 1.0
+        for i in range(k):
+            prob *= (safe_tiles - i) / (total_tiles - i)
+
+        if prob == 0:
+            multipliers.append(0)
+        else:
+            multiplier = rtp / prob
+            multipliers.append(round(multiplier, 2))
+
+    return multipliers
 
 @app.route('/')
 def home():
@@ -116,43 +135,28 @@ def play():
 
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
-    # If already logged in as admin, show admin panel
-    if session.get('admin'):
-        try:
-            conn = db_conn()
-            c = conn.cursor()
-
-            # Add balance if requested
-            if request.args.get('adduser') and request.args.get('amount'):
-                user = request.args['adduser']
-                amount = float(request.args['amount'])
-                c.execute("UPDATE users SET balance = balance + ? WHERE username = ?", (amount, user))
-                conn.commit()
-
-            c.execute("SELECT username, balance FROM users")
-            users = c.fetchall()
-            conn.close()
-
-            return render_template('admin.html', users=users)
-
-        except Exception as e:
-            return f"An error occurred in /admin: {e}"
-
-    # Handle login form submission
     if request.method == 'POST':
-        if request.form.get('password') == 'Jcrx2009':
-            session['admin'] = True
-            return redirect('/admin')
-        else:
+        if request.form.get('password') != 'Jcrx2009':
             return render_template('admin_login.html', error="Wrong password.")
+        session['admin'] = True
 
-    # Show login form
-    return render_template('admin_login.html')
+    if not session.get('admin'):
+        return render_template('admin_login.html')
 
-@app.route('/admin/logout')
-def admin_logout():
-    session.pop('admin', None)
-    return redirect('/')
+    try:
+        conn = db_conn()
+        c = conn.cursor()
+        if request.args.get('adduser') and request.args.get('amount'):
+            user = request.args['adduser']
+            amount = float(request.args['amount'])
+            c.execute("UPDATE users SET balance = balance + ? WHERE username = ?", (amount, user))
+            conn.commit()
+        c.execute("SELECT username, balance FROM users")
+        users = c.fetchall()
+        conn.close()
+        return render_template('admin.html', users=users)
+    except Exception as e:
+        return f"An error occurred in /admin: {e}"
 
 @app.route('/history')
 def history():
@@ -165,79 +169,59 @@ def history():
     conn.close()
     return render_template('history.html', history=history)
 
-@app.route('/info')
-def info():
-    return render_template('info.html')
-
-import json
-import uuid
-
-# Mines game storage (temporary in memory)
-active_mines_games = {}
-
 @app.route('/mines')
-def mines():
+def mines_page():
     if 'user' not in session:
         return redirect('/')
-    return render_template('mines.html', user=session['user'])
+    return render_template('mines.html')
 
 @app.route('/mines/start', methods=['POST'])
 def mines_start():
+    data = request.get_json()
+    bet = float(data['bet'])
+    bombs = int(data['bombs'])
+
     if 'user' not in session:
         return jsonify({'error': 'Login required'})
-
-    data = request.json
-    bet = float(data.get('bet'))
-    bombs = int(data.get('bombs'))
-
-    if bet < 0.1 or bet > 1000:
-        return jsonify({'error': 'Invalid bet size'})
-    if bombs < 1 or bombs > 24:
-        return jsonify({'error': 'Invalid bomb count'})
 
     conn = db_conn()
     c = conn.cursor()
     c.execute("SELECT balance FROM users WHERE username = ?", (session['user'],))
-    user = c.fetchone()
-    if not user or user[0] < bet:
+    row = c.fetchone()
+    if not row or row[0] < bet:
         conn.close()
         return jsonify({'error': 'Insufficient balance'})
 
-    # Deduct bet
-    new_balance = user[0] - bet
+    new_balance = row[0] - bet
     c.execute("UPDATE users SET balance = ? WHERE username = ?", (new_balance, session['user']))
     conn.commit()
     conn.close()
 
-    # Create grid with bombs
-    all_cells = [(r, c) for r in range(5) for c in range(5)]
-    bomb_cells = random.sample(all_cells, bombs)
-
+    bomb_cells = random.sample([(r, c) for r in range(5) for c in range(5)], bombs)
     game_id = str(uuid.uuid4())
+    multipliers = get_mines_multipliers(bombs)
+
     active_mines_games[game_id] = {
         'bombs': bomb_cells,
         'revealed': [],
         'bet': bet,
-        'user': session['user']
+        'user': session['user'],
+        'multipliers': multipliers,
+        'bomb_count': bombs
     }
 
     return jsonify({'game_id': game_id})
 
 @app.route('/mines/click', methods=['POST'])
 def mines_click():
-    if 'user' not in session:
-        return jsonify({'error': 'Login required'})
+    data = request.get_json()
+    game_id = data['game_id']
+    coord = (data['row'], data['col'])
 
-    data = request.json
-    game_id = data.get('game_id')
-    row = int(data.get('row'))
-    col = int(data.get('col'))
+    if game_id not in active_mines_games:
+        return jsonify({'error': 'Invalid game ID'})
 
-    game = active_mines_games.get(game_id)
-    if not game or game['user'] != session['user']:
-        return jsonify({'error': 'Game not found'})
-
-    coord = (row, col)
+    game = active_mines_games[game_id]
     if coord in game['revealed']:
         return jsonify({'error': 'Already revealed'})
 
@@ -246,27 +230,39 @@ def mines_click():
         return jsonify({'bomb': True, 'revealed': coord})
 
     game['revealed'].append(coord)
-    multiplier = round(1 + 0.2 * len(game['revealed']), 2)
+    safe_clicks = len(game['revealed'])
+
+    if safe_clicks <= len(game['multipliers']):
+        multiplier = game['multipliers'][safe_clicks - 1]
+    else:
+        multiplier = game['multipliers'][-1]
 
     return jsonify({
         'bomb': False,
         'revealed': coord,
-        'multiplier': multiplier,
-        'safe_count': len(game['revealed'])
+        'multiplier': round(multiplier, 2),
+        'safe_count': safe_clicks
     })
 
 @app.route('/mines/cashout', methods=['POST'])
 def mines_cashout():
-    if 'user' not in session:
-        return jsonify({'error': 'Login required'})
+    data = request.get_json()
+    game_id = data['game_id']
 
-    data = request.json
-    game_id = data.get('game_id')
-    game = active_mines_games.pop(game_id, None)
-    if not game or game['user'] != session['user']:
-        return jsonify({'error': 'Invalid game'})
+    if game_id not in active_mines_games:
+        return jsonify({'error': 'Invalid game ID'})
 
-    payout = round(game['bet'] * (1 + 0.2 * len(game['revealed'])), 2)
+    game = active_mines_games[game_id]
+    if game['user'] != session['user']:
+        return jsonify({'error': 'Not your game'})
+
+    safe_clicks = len(game['revealed'])
+    if safe_clicks == 0:
+        payout = 0
+    elif safe_clicks <= len(game['multipliers']):
+        payout = round(game['bet'] * game['multipliers'][safe_clicks - 1], 2)
+    else:
+        payout = round(game['bet'] * game['multipliers'][-1], 2)
 
     conn = db_conn()
     c = conn.cursor()
@@ -274,9 +270,9 @@ def mines_cashout():
     conn.commit()
     conn.close()
 
+    del active_mines_games[game_id]
     return jsonify({'payout': payout})
 
-# ✅ Required for Render
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
