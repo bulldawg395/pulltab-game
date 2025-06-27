@@ -1,175 +1,209 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Mines – Casino Game</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <meta charset="UTF-8">
+  <title>Mines Game</title>
+  <link rel="stylesheet" href="/static/style.css" />
   <style>
     body {
-      margin: 0;
-      background: linear-gradient(to bottom, #111, #222);
-      font-family: 'Segoe UI', sans-serif;
+      background: #0a0a0a;
       color: #fff;
-    }
-
-    .mines-container {
+      font-family: 'Segoe UI', sans-serif;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: flex-start;
-      height: 100vh;
-      padding-top: 40px;
+      min-height: 100vh;
+      margin: 0;
     }
-
-    .title {
-      font-size: 36px;
-      margin-bottom: 10px;
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      width: 90%;
+      max-width: 1000px;
+      margin: 20px 0;
     }
-
+    .game-title {
+      font-size: 28px;
+      font-weight: 700;
+    }
+    .balance-display {
+      font-size: 20px;
+      font-weight: 600;
+    }
     .controls {
       margin-bottom: 20px;
       text-align: center;
     }
-
-    .controls input, .controls button {
-      margin: 5px;
+    input, select, button {
       padding: 10px;
       font-size: 16px;
-      border: none;
+      margin: 5px;
       border-radius: 6px;
+      border: none;
     }
-
+    button {
+      background: #2980b9;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #3498db;
+    }
     .grid {
       display: grid;
-      grid-template-columns: repeat(5, 80px);
-      grid-gap: 10px;
-      margin-bottom: 20px;
+      grid-template-columns: repeat(5, 60px);
+      grid-template-rows: repeat(5, 60px);
+      gap: 10px;
+      margin: 30px auto;
     }
-
     .tile {
-      width: 80px;
-      height: 80px;
-      font-size: 28px;
-      font-weight: bold;
-      background: #333;
-      color: white;
+      background: #2c3e50;
+      border: 2px solid #34495e;
       display: flex;
       align-items: center;
       justify-content: center;
+      font-size: 24px;
       border-radius: 8px;
-      cursor: pointer;
-      transition: background 0.2s;
+      user-select: none;
+      cursor: default;
     }
-
-    .tile.revealed { background: #28a745; }
-    .tile.bomb { background: #dc3545; }
-
-    .message {
-      font-size: 18px;
-      color: #ccc;
-      margin-top: 10px;
+    .tile.revealed {
+      background-color: #16a085;
+      cursor: not-allowed;
     }
-
-    .nav {
-      position: absolute;
-      top: 10px;
-      left: 20px;
+    .tile.bomb {
+      background-color: #e74c3c;
     }
-
-    .nav a {
-      color: #0af;
-      text-decoration: none;
-      font-size: 14px;
+    .disabled {
+      pointer-events: none;
+      opacity: 0.6;
     }
   </style>
 </head>
 <body>
-  <div class="nav">
-    <a href="/">← Back to Home</a>
-  </div>
-  <div class="mines-container">
-    <div class="title">💣 Mines</div>
 
-    <div class="controls">
-      <input id="bet" type="number" step="0.1" min="0.1" max="1000" value="1.00" placeholder="Bet Amount ($)">
-      <input id="bombs" type="number" min="1" max="24" value="3" placeholder="Bombs">
-      <button onclick="startGame()">Start Game</button>
-      <button onclick="cashout()">Cash Out</button>
-    </div>
-
-    <div class="grid" id="grid"></div>
-    <div class="message" id="message">Start a game to begin.</div>
+  <div class="top-bar">
+    <div class="game-title">Mines</div>
+    <div class="balance-display">Balance: $<span id="balance">0.00</span></div>
   </div>
+
+  <div class="controls">
+    <label for="wager">Wager ($):</label>
+    <input type="number" id="wager" min="0.1" max="1000" step="0.1" value="1">
+    
+    <label for="bombs">Bombs (1–24):</label>
+    <input type="number" id="bombs" min="1" max="24" value="3">
+    
+    <button onclick="startGame()">Start Game</button>
+    <button onclick="cashOut()" id="cashoutBtn" style="display:none;">Cash Out</button>
+  </div>
+
+  <div id="grid" class="grid"></div>
 
   <script>
-    let gameId = null;
+    let gameActive = false;
+    let selectedTiles = [];
+    let bombPositions = new Set();
+    const gridEl = document.getElementById('grid');
+    const balanceEl = document.getElementById('balance');
 
-    function startGame() {
-      const bet = parseFloat(document.getElementById("bet").value);
-      const bombs = parseInt(document.getElementById("bombs").value);
-      fetch('/mines/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bet, bombs })
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.error) return alert(data.error);
-        gameId = data.game_id;
-        drawGrid();
-        document.getElementById("message").textContent = "Game started! Click tiles.";
-      });
+    function updateBalance() {
+      fetch('/balance')
+        .then(res => res.json())
+        .then(data => {
+          balanceEl.textContent = data.balance.toFixed(2);
+        });
     }
 
-    function drawGrid() {
-      const grid = document.getElementById("grid");
-      grid.innerHTML = "";
-      for (let r = 0; r < 5; r++) {
-        for (let c = 0; c < 5; c++) {
-          const tile = document.createElement("div");
-          tile.className = "tile";
-          tile.onclick = () => clickTile(r, c, tile);
-          grid.appendChild(tile);
-        }
+    function buildGrid() {
+      gridEl.innerHTML = '';
+      for (let i = 0; i < 25; i++) {
+        const tile = document.createElement('div');
+        tile.className = 'tile';
+        tile.dataset.index = i;
+        tile.textContent = '';
+        tile.addEventListener('click', () => revealTile(i, tile));
+        gridEl.appendChild(tile);
       }
     }
 
-    function clickTile(r, c, tileDiv) {
-      if (!gameId || tileDiv.classList.contains('revealed')) return;
-      fetch('/mines/click', {
+    function startGame() {
+      const wager = parseFloat(document.getElementById('wager').value);
+      const bombs = parseInt(document.getElementById('bombs').value);
+      if (isNaN(wager) || isNaN(bombs) || bombs < 1 || bombs > 24) {
+        alert("Enter valid wager and bomb count (1–24).");
+        return;
+      }
+
+      fetch('/mines_start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ game_id: gameId, row: r, col: c })
+        body: JSON.stringify({ wager, bombs })
       })
       .then(res => res.json())
       .then(data => {
-        if (data.bomb) {
-          tileDiv.classList.add('bomb');
-          tileDiv.textContent = "💥";
-          document.getElementById("message").textContent = "💥 You hit a bomb!";
-          gameId = null;
+        if (data.success) {
+          gameActive = true;
+          selectedTiles = [];
+          bombPositions = new Set(data.bombs);
+          document.querySelectorAll('.tile').forEach(t => {
+            t.classList.remove('revealed', 'bomb', 'disabled');
+            t.textContent = '';
+          });
+          document.getElementById('cashoutBtn').style.display = 'inline-block';
+          updateBalance();
         } else {
-          tileDiv.classList.add('revealed');
-          tileDiv.textContent = "✅";
-          document.getElementById("message").textContent = `Safe! Multiplier: x${data.multiplier}`;
+          alert(data.error || 'Error starting game.');
         }
       });
     }
 
-    function cashout() {
-      if (!gameId) return;
-      fetch('/mines/cashout', {
+    function revealTile(index, tile) {
+      if (!gameActive || tile.classList.contains('revealed')) return;
+
+      if (bombPositions.has(index)) {
+        tile.classList.add('bomb');
+        tile.textContent = '💣';
+        endGame(false);
+      } else {
+        tile.classList.add('revealed');
+        selectedTiles.push(index);
+      }
+    }
+
+    function endGame(won) {
+      gameActive = false;
+      document.querySelectorAll('.tile').forEach(t => t.classList.add('disabled'));
+      document.getElementById('cashoutBtn').style.display = 'none';
+
+      if (!won) {
+        alert('💥 You hit a bomb! Game over.');
+      }
+    }
+
+    function cashOut() {
+      if (selectedTiles.length === 0) return;
+
+      fetch('/mines_cashout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ game_id: gameId })
+        body: JSON.stringify({ path: selectedTiles })
       })
       .then(res => res.json())
       .then(data => {
-        if (data.payout) {
-          document.getElementById("message").textContent = `💰 You cashed out: $${data.payout}`;
-          gameId = null;
+        if (data.success) {
+          alert(`✅ You cashed out $${data.payout.toFixed(2)}`);
+          updateBalance();
+        } else {
+          alert('Error cashing out.');
         }
+        endGame(true);
       });
     }
+
+    updateBalance();
+    buildGrid();
   </script>
+
 </body>
 </html>
