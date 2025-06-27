@@ -1,78 +1,34 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Beach Pull Tabs</title>
-  <link rel="stylesheet" href="/static/style.css">
-</head>
-<body>
-  <header>
-    <h1>🏝️ Beach Pull Tabs</h1>
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Beach Pull Tabs</title>
+<link rel="stylesheet" href="/static/style.css"></head><body>
+<div class="container">
+  <header><h1>🏝️ Beach Pull Tabs</h1>
     <nav>
-      {% if logged_in %}
-        <span>Hello, {{ username }}!</span>
-        <a href="/logout">Logout</a>
-      {% else %}
-        <a href="#register">Register</a>
-        <a href="#login">Login</a>
-      {% endif %}
+      {% if logged %}<span>{{user}}</span><a href="/logout">Logout</a>{% else %}
+      <a href="#register">Register</a><a href="#login">Login</a>{% endif %}
+      {% if logged %}<a href="/history">My Wins</a>{% endif %}
       <a href="/admin">Admin</a>
     </nav>
   </header>
-
-  <main>
-    {% if not logged_in %}
-      <form action="/register" method="POST">
-        <input name="username" placeholder="Username">
-        <input name="password" type="password" placeholder="Password">
-        <button type="submit">Register</button>
-      </form>
-      <form action="/login" method="POST">
-        <input name="username" placeholder="Username">
-        <input name="password" type="password" placeholder="Password">
-        <button type="submit">Login</button>
-      </form>
-    {% else %}
-      <div id="game">
-        <p>Balance: $<span id="balance">0</span></p>
-        <div id="spinner">
-          <div id="s1">❓</div>
-          <div id="s2">❓</div>
-          <div id="s3">❓</div>
-        </div>
-        <button id="play" onclick="play()">Play $1</button>
-        <p id="result"></p>
-      </div>
-    {% endif %}
-  </main>
-
-  <script>
-    async function updateBalance() {
-      const res = await fetch("/balance");
-      const data = await res.json();
-      document.getElementById("balance").innerText = data.balance;
-    }
-
-    async function play() {
-      document.getElementById("result").innerText = "Spinning...";
-      document.getElementById("spinner").classList.add("spin");
-
-      const res = await fetch("/play", { method: "POST" });
-      const data = await res.json();
-
-      document.getElementById("spinner").classList.remove("spin");
-
-      if (data.error) {
-        alert(data.error);
-      } else {
-        ["s1", "s2", "s3"].forEach((id, i) => {
-          document.getElementById(id).innerText = data.symbols[i];
-        });
-        document.getElementById("result").innerText = data.payout > 0 ? `🎉 You won $${data.payout}!` : "Try again!";
-        updateBalance();
-      }
-    }
-
-    {% if logged_in %} updateBalance(); {% endif %}
-  </script>
-</body>
-</html>
+  <main>{% if not logged %}
+    <form id="register" action="/register" method="POST"><input name="username" placeholder="User"><input name="password" type="password" placeholder="Pass"><button>Sign Up</button></form>
+    <form id="login" action="/login" method="POST"><input name="username" placeholder="User"><input name="password" type="password" placeholder="Pass"><button>Login</button></form>
+  {% else %}
+    <div class="game">
+      <p>Balance: 💰 $<span id="bal">0</span></p>
+      <div class="spinner"><div id="s1">❓</div><div id="s2">❓</div><div id="s3">❓</div></div>
+      <button id="playBtn" onclick="play()">PLAY $1</button>
+      <p id="msg"></p>
+    </div>
+  {% endif %}</main>
+  <footer><p>&copy;2025 Beach Pull Tabs</p></footer>
+</div>
+<script>
+async function update(){let r=await fetch("/balance");r=await r.json();document.getElementById("bal").innerText=r.balance;}
+async function play(){
+document.getElementById("msg").innerText="Spinning...";document.querySelector(".spinner").classList.add("spin");let r=await fetch("/play",{method:"POST"});let d=await r.json();document.querySelector(".spinner").classList.remove("spin");
+if(d.error)return alert(d.error);
+["s1","s2","s3"].forEach((id,i)=>document.getElementById(id).innerText=d.symbols[i]);
+document.getElementById("msg").innerText = d.payout ? `🎉 You won $${d.payout}!` : "Try again!";
+update();document.getElementById("playBtn").disabled=false;
+}
+{% if logged %}update();{% endif %}</script></body></html>
