@@ -93,17 +93,24 @@ nav a:hover {
   background: #51ff2a;
 }
 
-/* -------- GAME BOX -------- */
+/* -------- GAME LAYOUT -------- */
+
+.game-layout {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 40px;
+  flex-wrap: wrap;
+  padding-top: 30px;
+}
 
 .game-box {
   text-align: center;
   background: #111;
   padding: 50px 20px;
   border-radius: 12px;
-  margin-top: 40px;
   max-width: 1000px;
-  margin-left: auto;
-  margin-right: auto;
+  box-shadow: 0 0 15px #0f0;
 }
 
 .balance {
@@ -131,16 +138,6 @@ nav a:hover {
   align-items: center;
   justify-content: center;
   box-shadow: 0 0 15px #0f0;
-}
-
-.reel-container.spin .reel {
-  animation: spin 0.2s ease-in-out infinite alternate;
-}
-
-@keyframes spin {
-  to {
-    transform: translateY(-10px);
-  }
 }
 
 #playBtn {
@@ -173,44 +170,42 @@ nav a:hover {
   color: #fff;
 }
 
-/* -------- INFO PAGE -------- */
+/* -------- PAYOUTS PANEL -------- */
 
-.info-page {
-  max-width: 800px;
-  margin: 40px auto;
-  padding: 20px;
+.payouts-box {
   background: #111;
+  border: 2px solid #39ff14;
+  padding: 20px;
   border-radius: 10px;
-  box-shadow: 0 0 12px #222;
-  text-align: center;
-}
-
-.info-page h2 {
-  margin-top: 30px;
-  margin-bottom: 15px;
-  color: #39ff14;
-}
-
-.info-page p {
-  margin-top: 10px;
-  font-size: 1.1rem;
-}
-
-.info-page table {
-  width: 100%;
-  background: rgba(255, 255, 255, 0.05);
-  border-collapse: collapse;
   color: #fff;
-  margin-top: 20px;
-  border-radius: 6px;
-  overflow: hidden;
+  box-shadow: 0 0 10px #222;
+  width: 280px;
 }
 
-.info-page th,
-.info-page td {
-  padding: 15px;
-  border: 1px solid #444;
-  font-size: 1rem;
+.payouts-box h3 {
+  margin-bottom: 15px;
+  font-size: 1.2rem;
+  color: #39ff14;
+  text-align: center;
+  border-bottom: 1px solid #333;
+  padding-bottom: 5px;
+}
+
+.payout-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 1.4rem;
+  padding: 8px 0;
+  border-bottom: 1px solid #222;
+}
+
+.combo {
+  font-family: monospace;
+}
+
+.amount {
+  color: #39ff14;
+  font-weight: bold;
 }
 
 /* -------- FOOTER -------- */
