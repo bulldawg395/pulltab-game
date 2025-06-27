@@ -1,0 +1,14 @@
+body {
+  text-align: center;
+  font-family: sans-serif;
+  background: linear-gradient(to bottom, #87ceeb, #fdf5e6);
+  padding: 30px;
+}
+input, button {
+  margin: 5px;
+  padding: 10px;
+  font-size: 1em;
+}
+form {
+  margin-bottom: 20px;
+}
