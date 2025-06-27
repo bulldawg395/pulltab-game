@@ -169,6 +169,113 @@ def history():
 def info():
     return render_template('info.html')
 
+import json
+import uuid
+
+# Mines game storage (temporary in memory)
+active_mines_games = {}
+
+@app.route('/mines')
+def mines():
+    if 'user' not in session:
+        return redirect('/')
+    return render_template('mines.html', user=session['user'])
+
+@app.route('/mines/start', methods=['POST'])
+def mines_start():
+    if 'user' not in session:
+        return jsonify({'error': 'Login required'})
+
+    data = request.json
+    bet = float(data.get('bet'))
+    bombs = int(data.get('bombs'))
+
+    if bet < 0.1 or bet > 1000:
+        return jsonify({'error': 'Invalid bet size'})
+    if bombs < 1 or bombs > 24:
+        return jsonify({'error': 'Invalid bomb count'})
+
+    conn = db_conn()
+    c = conn.cursor()
+    c.execute("SELECT balance FROM users WHERE username = ?", (session['user'],))
+    user = c.fetchone()
+    if not user or user[0] < bet:
+        conn.close()
+        return jsonify({'error': 'Insufficient balance'})
+
+    # Deduct bet
+    new_balance = user[0] - bet
+    c.execute("UPDATE users SET balance = ? WHERE username = ?", (new_balance, session['user']))
+    conn.commit()
+    conn.close()
+
+    # Create grid with bombs
+    all_cells = [(r, c) for r in range(5) for c in range(5)]
+    bomb_cells = random.sample(all_cells, bombs)
+
+    game_id = str(uuid.uuid4())
+    active_mines_games[game_id] = {
+        'bombs': bomb_cells,
+        'revealed': [],
+        'bet': bet,
+        'user': session['user']
+    }
+
+    return jsonify({'game_id': game_id})
+
+@app.route('/mines/click', methods=['POST'])
+def mines_click():
+    if 'user' not in session:
+        return jsonify({'error': 'Login required'})
+
+    data = request.json
+    game_id = data.get('game_id')
+    row = int(data.get('row'))
+    col = int(data.get('col'))
+
+    game = active_mines_games.get(game_id)
+    if not game or game['user'] != session['user']:
+        return jsonify({'error': 'Game not found'})
+
+    coord = (row, col)
+    if coord in game['revealed']:
+        return jsonify({'error': 'Already revealed'})
+
+    if coord in game['bombs']:
+        del active_mines_games[game_id]
+        return jsonify({'bomb': True, 'revealed': coord})
+
+    game['revealed'].append(coord)
+    multiplier = round(1 + 0.2 * len(game['revealed']), 2)
+
+    return jsonify({
+        'bomb': False,
+        'revealed': coord,
+        'multiplier': multiplier,
+        'safe_count': len(game['revealed'])
+    })
+
+@app.route('/mines/cashout', methods=['POST'])
+def mines_cashout():
+    if 'user' not in session:
+        return jsonify({'error': 'Login required'})
+
+    data = request.json
+    game_id = data.get('game_id')
+    game = active_mines_games.pop(game_id, None)
+    if not game or game['user'] != session['user']:
+        return jsonify({'error': 'Invalid game'})
+
+    payout = round(game['bet'] * (1 + 0.2 * len(game['revealed'])), 2)
+
+    conn = db_conn()
+    c = conn.cursor()
+    c.execute("UPDATE users SET balance = balance + ? WHERE username = ?", (payout, session['user']))
+    conn.commit()
+    conn.close()
+
+    return jsonify({'payout': payout})
+
 # ✅ Required for Render
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
