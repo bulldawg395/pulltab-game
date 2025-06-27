@@ -273,6 +273,36 @@ def mines_cashout():
     del active_mines_games[game_id]
     return jsonify({'payout': payout})
 
+@app.route('/admin/remove')
+def admin_remove_balance():
+    if not session.get('admin'):
+        return redirect('/admin')
+
+    user = request.args.get('removeuser')
+    amount = float(request.args.get('amount', 0))
+
+    conn = db_conn()
+    c = conn.cursor()
+    c.execute("UPDATE users SET balance = balance - ? WHERE username = ?", (amount, user))
+    conn.commit()
+    conn.close()
+
+    return redirect('/admin')
+
+
+@app.route('/admin/user/<username>')
+def user_history(username):
+    if not session.get('admin'):
+        return redirect('/admin')
+
+    conn = db_conn()
+    c = conn.cursor()
+    c.execute("SELECT symbols, payout, timestamp FROM spins WHERE username = ? ORDER BY id DESC", (username,))
+    history = c.fetchall()
+    conn.close()
+
+    return render_template('user_history.html', username=username, history=history)
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
