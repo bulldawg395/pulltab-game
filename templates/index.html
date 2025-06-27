@@ -10,8 +10,12 @@
     <header>
       <h1>Beach Pull Tabs Casino</h1>
       <nav>
-        {% if logged %}<span>{{ user }}</span> | <a href="/logout">Logout</a> | <a href="/history">My Wins</a>{% else %}
-        <a href="#register">Register</a> | <a href="#login">Login</a>{% endif %}
+        {% if logged %}<span>{{ user }}</span> | 
+        <a href="/logout">Logout</a> | 
+        <a href="/history">My Wins</a>{% else %}
+        <a href="#register">Register</a> | 
+        <a href="#login">Login</a>{% endif %}
+        | <a href="/info">Payouts</a>
         | <a href="/admin">Admin</a>
       </nav>
     </header>
@@ -31,7 +35,7 @@
         </form>
       </section>
       {% else %}
-      <section class="game-box">
+      <section class="game-box big-game">
         <div class="balance">💰 $<span id="bal">0</span></div>
         <div class="reel-container">
           <div class="reel" id="s1">❓</div>
