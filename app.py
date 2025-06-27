@@ -4,13 +4,11 @@ from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
-
 DATABASE = 'casino.db'
 
 def db_conn():
     return sqlite3.connect(DATABASE)
 
-# Create tables if they don't exist
 def init_db():
     conn = db_conn()
     c = conn.cursor()
@@ -36,7 +34,6 @@ def init_db():
 
 init_db()
 
-# Symbols and payouts
 SYMBOLS = ['🌴', '🍍', '🌞', '🌊', '🏖️', '🐚']
 WINNING_COMBOS = {
     ('🌴', '🌴', '🌴'): 5,
@@ -44,12 +41,9 @@ WINNING_COMBOS = {
     ('🌞', '🌞', '🌞'): 50
 }
 
-# ---------------------- ROUTES ---------------------- #
-
 @app.route('/')
 def home():
-    logged = 'user' in session
-    return render_template('index.html', logged=logged, user=session.get('user'))
+    return render_template('index.html', logged='user' in session, user=session.get('user'))
 
 @app.route('/register', methods=['POST'])
 def register():
@@ -63,8 +57,7 @@ def register():
         session['user'] = username
     except sqlite3.IntegrityError:
         return "Username already taken."
-    finally:
-        conn.close()
+    conn.close()
     return redirect('/')
 
 @app.route('/login', methods=['POST'])
@@ -112,11 +105,8 @@ def play():
 
     symbols = tuple(random.choices(SYMBOLS, k=3))
     payout = WINNING_COMBOS.get(symbols, 0)
-
-    # 94.5% RTP adjustment (optional: force win chances)
-    # Not enforced here due to random sampling + set payout combos
-
     new_balance = row[0] - 1 + payout
+
     c.execute("UPDATE users SET balance = ? WHERE username = ?", (new_balance, session['user']))
     c.execute("INSERT INTO spins (username, symbols, payout, timestamp) VALUES (?, ?, ?, ?)",
               (session['user'], ''.join(symbols), payout, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
@@ -158,6 +148,6 @@ def history():
     conn.close()
     return render_template('history.html', history=history)
 
-@app.route("/info")
+@app.route('/info')
 def info():
-    return render_template("info.html")
+    return render_template('info.html')
