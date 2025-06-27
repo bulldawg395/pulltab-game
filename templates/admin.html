@@ -1,8 +1,27 @@
-<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Admin</title><link rel="stylesheet" href="/static/style.css"></head><body>
-<div class="container"><main><h2>Admin Panel</h2>
-{% if not access %}
-  <form method="POST" action="/admin"><input name="password" type="password" placeholder="Password"><button>Enter</button></form>
-{% else %}
-  <a class="back" href="/">← Home</a><table><tr><th>User</th><th>Balance</th></tr>{% for u,b in users %}<tr><td>{{u}}</td><td>${{b}}</td></tr>{% endfor %}</table>
-  <form method="POST" action="/admin/fund"><input name="username" placeholder="User"><input name="amount" placeholder="Amount"><input type="hidden" name="password" value="Jcrx2009"><button>Add Funds</button></form>
-{% endif %}</main></div></body></html>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Panel</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="container">
+    <h2>💼 Admin Panel</h2>
+    <a href="/">← Back to Home</a>
+
+    <h3>👤 All Users & Balances</h3>
+    <ul>
+      {% for user, balance in users %}
+        <li><strong>{{ user }}</strong> — 💰 ${{ balance }}</li>
+      {% endfor %}
+    </ul>
+
+    <h3>➕ Add Balance</h3>
+    <form method="GET" action="/admin">
+      <input type="text" name="adduser" placeholder="Username" required>
+      <input type="number" name="amount" placeholder="Amount" step="0.01" required>
+      <button type="submit">Add Funds</button>
+    </form>
+  </div>
+</body>
+</html>
