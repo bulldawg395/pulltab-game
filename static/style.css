@@ -1,63 +1,11 @@
-body {
-  margin: 0;
-  font-family: 'Segoe UI', sans-serif;
-  background: url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1500&q=80') no-repeat center center fixed;
-  background-size: cover;
-  color: #fff;
-  text-align: center;
-}
-
-header {
-  background: rgba(0,0,0,0.7);
-  padding: 20px;
-  font-size: 1.5em;
-}
-
-nav a {
-  margin: 0 10px;
-  color: #f9d342;
-  text-decoration: none;
-  font-weight: bold;
-}
-
-main {
-  background-color: rgba(0,0,0,0.6);
-  margin: 40px auto;
-  padding: 20px;
-  border-radius: 12px;
-  width: 90%;
-  max-width: 500px;
-}
-
-input, button {
-  display: block;
-  margin: 10px auto;
-  padding: 10px;
-  width: 90%;
-  border-radius: 5px;
-  border: none;
-  font-size: 1em;
-}
-
-button {
-  background-color: #f9d342;
-  color: #000;
-  cursor: pointer;
-}
-
-button:hover {
-  background-color: #ffe570;
-}
-
-#symbols {
-  font-size: 2em;
-  margin: 15px 0;
-}
-
-footer {
-  background-color: rgba(0,0,0,0.8);
-  padding: 10px;
-  position: fixed;
-  width: 100%;
-  bottom: 0;
-}
+body { margin: 0; font-family: sans-serif; background: #021; color: #fff; text-align: center; }
+header { background: #013; padding: 15px; }
+nav a { color: #0af; margin: 0 10px; text-decoration: none; }
+main { max-width: 500px; margin: 40px auto; background: #002; padding: 20px; border-radius: 8px; }
+input, button { padding: 10px; margin: 5px; width: 80%; font-size: 1em; }
+#spinner { display: flex; justify-content: center; margin: 20px; }
+#spinner div { width: 70px; height: 70px; background: #000; border: 2px solid #0af; border-radius: 10px; line-height: 70px; font-size: 2em; }
+.spin div { animation: bounce 0.3s infinite alternate; }
+@keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-10px); } }
+table { width: 100%; background: #fff; color: #000; margin-top: 20px; }
+th, td { padding: 10px; border-bottom: 1px solid #ccc; }
