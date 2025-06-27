@@ -181,6 +181,12 @@ def history():
 def info():
     return render_template('info.html')
 
+@app.route('/mines')
+def mines():
+    if 'user' not in session:
+        return redirect('/')
+    return render_template('mines.html', logged=True, user=session['user'])
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
