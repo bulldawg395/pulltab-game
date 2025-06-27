@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Beach Pull Tabs</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <h1>🌴 Beach Pull Tabs 🌞</h1>
+
+  {% if not logged_in %}
+    <form method="POST" action="/register">
+      <h2>Register</h2>
+      <input name="username" placeholder="Username" required><br>
+      <input name="password" type="password" placeholder="Password" required><br>
+      <button type="submit">Register</button>
+    </form>
+
+    <form method="POST" action="/login">
+      <h2>Login</h2>
+      <input name="username" placeholder="Username" required><br>
+      <input name="password" type="password" placeholder="Password" required><br>
+      <button type="submit">Login</button>
+    </form>
+  {% else %}
+    <h2>Welcome, {{ username }}!</h2>
+    <p>💰 Balance: $<span id="balance">...</span></p>
+    <div id="symbols" style="font-size: 2em;">❓ ❓ ❓</div>
+    <button onclick="play()">🎰 Play ($1)</button>
+    <form method="GET" action="/logout">
+      <button type="submit">Logout</button>
+    </form>
+    <p id="result"></p>
+    <script>
+      async function updateBalance() {
+        const res = await fetch("/balance");
+        const data = await res.json();
+        document.getElementById("balance").innerText = data.balance;
+      }
+      async function play() {
+        const res = await fetch("/play", { method: "POST" });
+        const data = await res.json();
+        if (data.error) {
+          alert(data.error);
+        } else {
+          document.getElementById("symbols").innerText = data.symbols.join(" ");
+          document.getElementById("result").innerText = data.payout > 0 ? `🎉 Won $${data.payout}` : "Try again!";
+          updateBalance();
+        }
+      }
+      updateBalance();
+    </script>
+  {% endif %}
+</body>
+</html>
