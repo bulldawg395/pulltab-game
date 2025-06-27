@@ -78,3 +78,7 @@ def fund():
     return redirect("/admin")
 
 app.run(host="0.0.0.0", port=3000)
+
+@app.route("/info")
+def info():
+    return render_template("info.html")
