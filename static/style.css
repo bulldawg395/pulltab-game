@@ -1,11 +1,17 @@
-body { margin: 0; font-family: sans-serif; background: #021; color: #fff; text-align: center; }
-header { background: #013; padding: 15px; }
-nav a { color: #0af; margin: 0 10px; text-decoration: none; }
-main { max-width: 500px; margin: 40px auto; background: #002; padding: 20px; border-radius: 8px; }
-input, button { padding: 10px; margin: 5px; width: 80%; font-size: 1em; }
-#spinner { display: flex; justify-content: center; margin: 20px; }
-#spinner div { width: 70px; height: 70px; background: #000; border: 2px solid #0af; border-radius: 10px; line-height: 70px; font-size: 2em; }
-.spin div { animation: bounce 0.3s infinite alternate; }
-@keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-10px); } }
-table { width: 100%; background: #fff; color: #000; margin-top: 20px; }
-th, td { padding: 10px; border-bottom: 1px solid #ccc; }
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#021126;color:#fff;font-family:'Arial',sans-serif}
+.container{display:flex;flex-direction:column;min-height:100vh}
+header, footer{background:#011;background:rgba(0,17,38,0.8);padding:20px;text-align:center}
+header nav a{margin:0 10px;color:#0af;text-decoration:none;font-weight:bold}
+main{flex:1;padding:20px;display:flex;justify-content:center;align-items:center;}
+.game{max-width:400px;width:100%;text-align:center;background:rgba(0,0,0,0.6);padding:30px;border-radius:12px}
+.spinner{display:flex;justify-content:space-around;margin:20px}
+.spinner div{width:80px;height:80px;background:#000;border:3px solid #0af;border-radius:10px;line-height:80px;font-size:2em}
+.spin div{animation:bounce 0.15s linear infinite alternate}
+@keyframes bounce{to{transform:translateY(-10px)}}
+button{width:100%;padding:15px;background:#0af;color:#000;font-size:1.2em;border:none;border-radius:8px;cursor:pointer;margin:10px 0}
+button:disabled{background:#555;color:#333;cursor:not-allowed}
+table{width:90%;margin:auto;border-collapse:collapse;background:rgba(255,255,255,0.9);color:#000;text-align:center}
+th,td{padding:10px;border:1px solid #ccc}
+.back{display:inline-block;margin-bottom:10px;color:#0af;text-decoration:none}
+input{width:90%;padding:10px;margin:10px auto;display:block;border:none;border-radius:5px}
