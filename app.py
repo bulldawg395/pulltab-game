@@ -1,14 +1,16 @@
 from flask import Flask, render_template, request, redirect, session, jsonify
-import sqlite3, random
+import sqlite3, random, os
 from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 DATABASE = 'casino.db'
 
+# Setup the database connection
 def db_conn():
     return sqlite3.connect(DATABASE)
 
+# Initialize tables
 def init_db():
     conn = db_conn()
     c = conn.cursor()
@@ -151,3 +153,8 @@ def history():
 @app.route('/info')
 def info():
     return render_template('info.html')
+
+# ✅ Required for Render to find your running app
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
