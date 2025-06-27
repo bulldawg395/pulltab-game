@@ -116,28 +116,43 @@ def play():
 
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
+    # If already logged in as admin, show admin panel
+    if session.get('admin'):
+        try:
+            conn = db_conn()
+            c = conn.cursor()
+
+            # Add balance if requested
+            if request.args.get('adduser') and request.args.get('amount'):
+                user = request.args['adduser']
+                amount = float(request.args['amount'])
+                c.execute("UPDATE users SET balance = balance + ? WHERE username = ?", (amount, user))
+                conn.commit()
+
+            c.execute("SELECT username, balance FROM users")
+            users = c.fetchall()
+            conn.close()
+
+            return render_template('admin.html', users=users)
+
+        except Exception as e:
+            return f"An error occurred in /admin: {e}"
+
+    # Handle login form submission
     if request.method == 'POST':
-        if request.form.get('password') != 'Jcrx2009':
+        if request.form.get('password') == 'Jcrx2009':
+            session['admin'] = True
+            return redirect('/admin')
+        else:
             return render_template('admin_login.html', error="Wrong password.")
-        session['admin'] = True
 
-    if not session.get('admin'):
-        return render_template('admin_login.html')
+    # Show login form
+    return render_template('admin_login.html')
 
-    try:
-        conn = db_conn()
-        c = conn.cursor()
-        if request.args.get('adduser') and request.args.get('amount'):
-            user = request.args['adduser']
-            amount = float(request.args['amount'])
-            c.execute("UPDATE users SET balance = balance + ? WHERE username = ?", (amount, user))
-            conn.commit()
-        c.execute("SELECT username, balance FROM users")
-        users = c.fetchall()
-        conn.close()
-        return render_template('admin.html', users=users)
-    except Exception as e:
-        return f"An error occurred in /admin: {e}"
+@app.route('/admin/logout')
+def admin_logout():
+    session.pop('admin', None)
+    return redirect('/')
 
 @app.route('/history')
 def history():
