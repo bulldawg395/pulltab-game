@@ -1,0 +1,5 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>My Wins</title><link rel="stylesheet" href="/static/style.css"></head><body>
+<div class="container"><header><h1>My Recent Wins</h1><nav><a href="/">Home</a><a href="/logout">Logout</a></nav></header>
+<main><table><tr><th>Combo</th><th>Payout</th><th>Time</th></tr>
+{% for c,p,t in hist %}<tr><td>{{c}}</td><td>${{p}}</td><td>{{t|slice(0,19)}}</td></tr>{% endfor %}</table></main><footer><p>&copy;2025 Beach Pull Tabs</p></footer></div>
+</body></html>
