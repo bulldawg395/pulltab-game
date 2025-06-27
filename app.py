@@ -139,7 +139,6 @@ def admin():
     conn = db_conn()
     c = conn.cursor()
 
-    # Adjust balances
     if request.args.get('adduser') and request.args.get('amount'):
         user = request.args['adduser']
         amount = float(request.args['amount'])
@@ -151,11 +150,8 @@ def admin():
         c.execute("UPDATE users SET balance = balance - ? WHERE username = ?", (amount, user))
         conn.commit()
 
-    # Get user list
     c.execute("SELECT username, balance FROM users")
     users = c.fetchall()
-
-    # Get tower plays
     c.execute("SELECT username, difficulty, wager, payout, timestamp FROM tower_plays ORDER BY id DESC LIMIT 20")
     towers = c.fetchall()
     conn.close()
@@ -166,6 +162,28 @@ def tower():
     if 'user' not in session:
         return redirect('/')
     return render_template('tower.html')
+
+@app.route('/tower_start', methods=['POST'])
+def tower_start():
+    if 'user' not in session:
+        return jsonify({'error': 'Not logged in'})
+
+    data = request.get_json()
+    wager = float(data['wager'])
+    username = session['user']
+    conn = db_conn()
+    c = conn.cursor()
+    c.execute("SELECT balance FROM users WHERE username = ?", (username,))
+    result = c.fetchone()
+    if not result or result[0] < wager:
+        conn.close()
+        return jsonify({'error': 'Insufficient balance'})
+    
+    # Deduct wager up front
+    c.execute("UPDATE users SET balance = balance - ? WHERE username = ?", (wager, username))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
 
 @app.route('/tower_play', methods=['POST'])
 def tower_play():
@@ -178,30 +196,18 @@ def tower_play():
     path = data['path']
     username = session['user']
 
-    conn = db_conn()
-    c = conn.cursor()
-
-    c.execute("SELECT balance FROM users WHERE username = ?", (username,))
-    result = c.fetchone()
-    if not result or result[0] < wager:
-        conn.close()
-        return jsonify({'error': 'Insufficient balance'})
-
     multipliers = {
         'easy': [1.26, 1.68, 2.24, 2.99, 3.98, 5.31, 7.08, 9.44, 12.59],
         'medium': [1.42, 2.13, 3.19, 4.78, 7.18, 10.76, 16.15, 24.22, 36.33],
         'hard': [1.89, 3.78, 7.56, 15.12, 30.24, 60.48, 120.96, 241.92, 483.84]
     }
 
-    multiplier = multipliers[difficulty][len(path)-1]
+    step = len(path)
+    multiplier = multipliers[difficulty][step - 1] if step > 0 else 1.0
     payout = round(wager * multiplier, 2)
-    new_balance = result[0] + payout
 
-    # Subtract wager at the beginning
-    c.execute("UPDATE users SET balance = balance - ? WHERE username = ?", (wager, username))
-    conn.commit()
-
-    # Add payout only if game result posted
+    conn = db_conn()
+    c = conn.cursor()
     c.execute("UPDATE users SET balance = balance + ? WHERE username = ?", (payout, username))
     c.execute("INSERT INTO tower_plays (username, difficulty, path, wager, payout, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
               (username, difficulty, json.dumps(path), wager, payout, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
