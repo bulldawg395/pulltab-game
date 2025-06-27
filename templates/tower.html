@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Tower Game</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css" />
   <style>
     body {
       background: #0a0a0a;
@@ -12,83 +12,118 @@
       display: flex;
       flex-direction: column;
       align-items: center;
+      margin: 0;
+      min-height: 100vh;
     }
     .top-bar {
       display: flex;
       justify-content: space-between;
       width: 90%;
       max-width: 1000px;
-      margin-top: 20px;
+      margin: 20px 0;
     }
     .game-title {
-      font-size: 24px;
-      font-weight: bold;
+      font-size: 28px;
+      font-weight: 700;
     }
     .balance-display {
-      font-size: 18px;
+      font-size: 20px;
+      font-weight: 600;
     }
     .controls {
       margin: 20px;
       text-align: center;
     }
-    select, input[type="number"] {
-      padding: 5px;
+    select,
+    input[type='number'] {
+      padding: 8px;
       font-size: 16px;
+      border-radius: 5px;
+      border: none;
+      margin: 0 10px;
+      width: 120px;
+      text-align: center;
+    }
+    button {
+      padding: 10px 25px;
+      font-size: 18px;
+      margin-top: 10px;
+      background: #2980b9;
+      border: none;
+      color: #fff;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    button:hover:not(:disabled) {
+      background: #3498db;
+    }
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
     }
     .tower-container {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
+      margin-bottom: 40px;
+      max-width: 1000px;
+      width: 90vw;
+      flex-grow: 1;
     }
     .tower-row {
       display: flex;
-      gap: 10px;
+      gap: 12px;
+      justify-content: center;
     }
     .tile {
-      width: 80px;
-      height: 80px;
-      font-size: 24px;
+      width: 90px;
+      height: 90px;
+      font-size: 28px;
       background: #222;
-      border: 2px solid #555;
-      border-radius: 8px;
+      border: 3px solid #555;
+      border-radius: 12px;
       cursor: pointer;
       display: flex;
       justify-content: center;
       align-items: center;
-      transition: all 0.2s ease-in-out;
+      user-select: none;
+      transition: all 0.3s ease;
+      box-shadow: 0 0 6px #000 inset;
     }
     .tile.correct {
-      background: #2ecc71;
+      background: #27ae60;
+      border-color: #2ecc71;
+      box-shadow: 0 0 20px #2ecc71;
+      cursor: default;
     }
     .tile.bomb {
-      background: #e74c3c;
+      background: #c0392b;
+      border-color: #e74c3c;
+      box-shadow: 0 0 20px #e74c3c;
+      cursor: default;
+      color: #fff;
     }
     .tile.disabled {
       opacity: 0.4;
       pointer-events: none;
     }
     .status {
-      margin: 20px;
-      font-size: 18px;
+      margin: 15px 0 5px;
+      font-size: 20px;
+      font-weight: 600;
+      height: 28px;
     }
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
-      margin-top: 10px;
-      background: #2980b9;
-      border: none;
-      color: #fff;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #3498db;
+    #payout-display {
+      margin-bottom: 25px;
+      font-size: 22px;
+      font-weight: 700;
+      color: #f39c12;
     }
   </style>
 </head>
 <body>
-
   <div class="top-bar">
     <div class="game-title">Tower</div>
     <div class="balance-display">Balance: $<span id="balance">0.00</span></div>
@@ -103,13 +138,24 @@
     </select>
 
     <label for="wager">Wager ($):</label>
-    <input type="number" id="wager" min="0.1" max="1000" step="0.1" value="1">
+    <input
+      type="number"
+      id="wager"
+      min="0.1"
+      max="1000"
+      step="0.1"
+      value="1"
+      autocomplete="off"
+    />
+
     <button id="start">Start Game</button>
-    <button id="cashout" style="display:none;">Cash Out</button>
+    <button id="cashout" style="display: none">Cash Out</button>
   </div>
 
   <div class="status" id="status">Game not started.</div>
-  <div class="status" id="payout-display" style="display:none;">Payout: $0 (1.00x)</div>
+  <div class="status" id="payout-display" style="display: none;">
+    Payout: $0 (1.00x)
+  </div>
 
   <div class="tower-container" id="tower"></div>
 
@@ -126,16 +172,16 @@
     let difficulty = 'easy';
     let wager = 1;
     let multiplier = 1.0;
-    let multipliers = {
+    const multipliers = {
       easy: [1.26, 1.68, 2.24, 2.99, 3.98, 5.31, 7.08, 9.44, 12.59],
       medium: [1.42, 2.13, 3.19, 4.78, 7.18, 10.76, 16.15, 24.22, 36.33],
-      hard: [1.89, 3.78, 7.56, 15.12, 30.24, 60.48, 120.96, 241.92, 483.84]
+      hard: [1.89, 3.78, 7.56, 15.12, 30.24, 60.48, 120.96, 241.92, 483.84],
     };
 
     function updateBalance() {
       fetch('/balance')
-        .then(res => res.json())
-        .then(data => {
+        .then((res) => res.json())
+        .then((data) => {
           balanceEl.textContent = data.balance.toFixed(2);
         });
     }
@@ -161,31 +207,34 @@
       if (parseInt(tile.dataset.row) !== currentRow) return;
 
       const tilesInRow = towerEl.children[currentRow].children;
+      // Lock other tiles in this row
       for (let i = 0; i < tilesInRow.length; i++) {
         tilesInRow[i].classList.add('disabled');
       }
 
-      // Random bomb
       const rowLength = tilesInRow.length;
+      // Random bomb position for this row
       const bomb = Math.floor(Math.random() * rowLength);
       if (parseInt(tile.dataset.col) === bomb) {
         tile.classList.add('bomb');
-        statusEl.textContent = '💥 You hit a bomb!';
+        statusEl.textContent = '💥 You hit a bomb! Game over.';
         startBtn.disabled = false;
         cashoutBtn.style.display = 'none';
         currentRow = 0;
         gamePath = [];
-        return;
+        payoutDisplay.style.display = 'none';
       } else {
         tile.classList.add('correct');
         gamePath.push(parseInt(tile.dataset.col));
         multiplier = multipliers[difficulty][currentRow];
         payoutDisplay.style.display = 'block';
-        payoutDisplay.textContent = `Payout: $${(wager * multiplier).toFixed(2)} (${multiplier.toFixed(2)}x)`;
+        payoutDisplay.textContent = `Payout: $${(wager * multiplier).toFixed(
+          2
+        )} (${multiplier.toFixed(2)}x)`;
         currentRow++;
 
         if (currentRow >= 9) {
-          statusEl.textContent = '🎉 You beat the tower!';
+          statusEl.textContent = '🎉 You beat the tower! Auto cashing out.';
           cashout();
         }
       }
@@ -194,25 +243,34 @@
     function startGame() {
       difficulty = document.getElementById('difficulty').value;
       wager = parseFloat(document.getElementById('wager').value);
-      currentRow = 0;
-      gamePath = [];
+      statusEl.textContent = '';
       payoutDisplay.style.display = 'none';
-      statusEl.textContent = 'Game Started';
-      cashoutBtn.style.display = 'inline-block';
-      startBtn.disabled = true;
 
-      const cols = difficulty === 'easy' ? 4 : difficulty === 'medium' ? 3 : 2;
-      buildTower(9, cols);
+      fetch('/tower_start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wager }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success) {
+            currentRow = 0;
+            gamePath = [];
+            statusEl.textContent = 'Game Started';
+            cashoutBtn.style.display = 'inline-block';
+            startBtn.disabled = true;
 
-      // Subtract wager right away
-      fetch('/balance')
-        .then(res => res.json())
-        .then(data => {
-          if (data.balance >= wager) {
+            const cols =
+              difficulty === 'easy'
+                ? 4
+                : difficulty === 'medium'
+                ? 3
+                : 2;
+            buildTower(9, cols);
+
             updateBalance();
           } else {
-            statusEl.textContent = 'Not enough balance.';
-            startBtn.disabled = false;
+            statusEl.textContent = data.error || 'Error starting game';
           }
         });
     }
@@ -226,22 +284,23 @@
         body: JSON.stringify({
           difficulty: difficulty,
           wager: wager,
-          path: gamePath
-        })
+          path: gamePath,
+        }),
       })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          statusEl.textContent = `✅ Cashed out $${data.payout.toFixed(2)}`;
-          updateBalance();
-        } else {
-          statusEl.textContent = 'Error cashing out.';
-        }
-        cashoutBtn.style.display = 'none';
-        startBtn.disabled = false;
-        currentRow = 0;
-        gamePath = [];
-      });
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success) {
+            statusEl.textContent = `✅ Cashed out $${data.payout.toFixed(2)}`;
+            updateBalance();
+          } else {
+            statusEl.textContent = 'Error cashing out.';
+          }
+          cashoutBtn.style.display = 'none';
+          startBtn.disabled = false;
+          currentRow = 0;
+          gamePath = [];
+          payoutDisplay.style.display = 'none';
+        });
     }
 
     document.getElementById('start').addEventListener('click', startGame);
@@ -249,6 +308,5 @@
 
     updateBalance();
   </script>
-
 </body>
 </html>
